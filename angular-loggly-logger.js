@@ -31,6 +31,42 @@
       var token = null;
       var endpoint = '://logs-01.loggly.com/inputs/';
 
+      var requestErrorMap = {};
+      var requestQueue = [];
+      var requestSlots = 5;
+      var responsePending = 0;
+      var cleanupDelay = 1000;
+      var suppressRequestsOnError = true;
+
+      var onsuccess = function(){
+        responsePending--;
+        processRequests();
+      };
+
+      var onerror = function(data, status, headers, config){
+        var cleanupCallback = function(){
+          delete requestErrorMap[timeoutId];
+        };
+        var timeoutId = window.setTimeout(cleanupCallback, cleanupDelay);
+        requestErrorMap[timeoutId] = config;
+        responsePending--;
+        processRequests();
+      };
+
+      var processRequests = function(){
+        var requestErrorMapSize = Object.keys(requestErrorMap).length;
+        var remainingRequestSlots = (requestSlots - responsePending - requestErrorMapSize);
+        if(suppressRequestsOnError === true && requestErrorMapSize === requestSlots){
+          requestQueue.splice(0, requestQueue.length);
+        }
+        if(requestQueue.length > 0 && remainingRequestSlots > 0){
+          responsePending++;
+          var request = requestQueue.shift();
+          request().success(onsuccess).error(onerror);
+          processRequests(); // start requests until no more slots are available
+        }
+      };
+
         var buildUrl = function () {
           return (https ? 'https' : 'http') + endpoint + token + '/tag/' + (tag ? tag : 'AngularJS' ) + '/';
         };
@@ -185,8 +221,11 @@
           };
 
 
-          //Ajax call to send data to loggly
-          $http.post(buildUrl(),sentData,config);
+          requestQueue.push(function(){
+            //Ajax call to send data to loggly
+            return $http.post(buildUrl(),sentData,config);
+          });
+          processRequests();
         };
 
         var attach = function() {
