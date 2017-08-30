@@ -69,7 +69,7 @@
         if(requestQueue.length > 0 && remainingRequestSlots > 0){
           responsePending++;
           var request = requestQueue.shift();
-          request().success(onsuccess).error(onerror);
+          request().then(onsuccess).catch(onerror);
           processRequests(); // start requests until no more slots are available
         }
       };
