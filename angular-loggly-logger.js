@@ -38,10 +38,10 @@
       var token = null;
       var endpoint = '://logs-01.loggly.com/inputs/';
 
+      var requestQueue = [];
       var requestSlots = 5;
       var requestErrors = 0;
       var responsesPending = 0;
-      var requestQueue = [];
       var requestErrorCleanupDelay = 1000;
 
       var handleRequestSuccess = function(){
