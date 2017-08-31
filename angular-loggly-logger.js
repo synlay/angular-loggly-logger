@@ -38,38 +38,37 @@
       var token = null;
       var endpoint = '://logs-01.loggly.com/inputs/';
 
-      var requestErrorMap = {};
-      var requestQueue = [];
       var requestSlots = 5;
-      var responsePending = 0;
-      var cleanupDelay = 1000;
-      var suppressRequestsOnError = true;
+      var requestErrors = 0;
+      var responsesPending = 0;
+      var requestQueue = [];
+      var requestErrorCleanupDelay = 1000;
 
-      var onsuccess = function(){
-        responsePending--;
+      var handleRequestSuccess = function(){
+        responsesPending--;
         processRequests();
       };
 
-      var onerror = function(data, status, headers, config){
-        var cleanupCallback = function(){
-          delete requestErrorMap[timeoutId];
-        };
-        var timeoutId = window.setTimeout(cleanupCallback, cleanupDelay);
-        requestErrorMap[timeoutId] = config;
-        responsePending--;
+      var handleRequestError = function(){
+        requestErrors++;
+        responsesPending--;
+        window.setTimeout(function(){
+          requestErrors--;
+        }, requestErrorCleanupDelay);
         processRequests();
       };
 
       var processRequests = function(){
-        var requestErrorMapSize = Object.keys(requestErrorMap).length;
-        var remainingRequestSlots = (requestSlots - responsePending - requestErrorMapSize);
-        if(suppressRequestsOnError === true && requestErrorMapSize === requestSlots){
-          requestQueue.splice(0, requestQueue.length);
+        var remainingRequestSlots = (requestSlots - responsesPending - requestErrors);
+
+        if(requestErrors === requestSlots){
+          requestQueue.splice(0, requestQueue.length); // clear requestQueue
         }
+
         if(requestQueue.length > 0 && remainingRequestSlots > 0){
-          responsePending++;
+          responsesPending++;
           var request = requestQueue.shift();
-          request().then(onsuccess).catch(onerror);
+          request().then(handleRequestSuccess, handleRequestError);
           processRequests(); // start requests until no more slots are available
         }
       };
